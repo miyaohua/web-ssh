@@ -68,10 +68,10 @@
                         ],
                     },
                     form: {
-                        host: '211.101.235.182',
-                        port: '22',
-                        username: 'root',
-                        password: '109aZqKjxRcyDCA'
+                        host: '',
+                        port: '',
+                        username: '',
+                        password: ''
                     }
                 };
             },
@@ -85,56 +85,59 @@
                     })
                 },
                 ws() {
-                    this.socket = io.connect("http://localhost:3000");
-                    this.socket.on('connect', () => {
-                        console.log('连接websocket成功')
-                        this.isConnect = false;
-                        console.log('开始初始化终端界面')
-                        this.term = new Terminal({
-                            cursorStyle: 'underline', //光标样式
-                            cursorBlink: true, // 光标闪烁
-                            convertEol: true, //启用时，光标将设置为下一行的开头
-                            disableStdin: false, //是否应禁用输入。
-                            theme: {
-                                foreground: 'white', //字体
-                                background: '#060101', //背景色
-                                cursor: 'help',//设置光标
-                            }
-                        });
-                        this.$nextTick(() => {
-                            this.term.open(document.getElementById('terminal'));
-                            console.log('初始化终端成功')
-                            this.term.focus();
-                        })
-                        // 通过服务器信息连接socket 后端连接ssh服务端
-                        this.socket.emit('ssh-connect', {
-                            ...this.form,
-                            cols: 100,
-                            rows: 20,
-                        })
-
-                        // 只要有键入 就会触发该事件
-                        this.term.onData((data) => {
-                            this.socket.emit("ssh-data", data);
-                        });
-
-
-                        // socket.on()用于监听获取服务端（后端）发送过来的数据, 第一个参数为监听的标识
-                        this.socket.on("ssh-data", (data) => {
-                            this.term.write(data)
-                        });
-
-                        window.addEventListener(
-                            "resize",
-                            () => {
-                                this.socket.emit("resize", {
-                                    cols: 100,
-                                    rows: 20,
-                                });
-                            },
-                            false
-                        );
+                    this.socket = io("http://localhost:3000");
+                    console.log('连接websocket成功')
+                    this.isConnect = false;
+                    console.log('开始初始化终端界面')
+                    this.term = new Terminal({
+                        rows: 35,
+                        cursorStyle: 'underline', //光标样式
+                        cursorBlink: true, // 光标闪烁
+                        convertEol: true, //启用时，光标将设置为下一行的开头
+                        disableStdin: false, //是否应禁用输入。
+                        theme: {
+                            foreground: 'white', //字体
+                            background: '#060101', //背景色
+                            cursor: 'help',//设置光标
+                        }
+                    });
+                    this.$nextTick(() => {
+                        this.term.open(document.getElementById('terminal'));
+                        console.log('初始化终端成功')
+                        this.term.focus();
                     })
+                    // 通过服务器信息连接socket 后端连接ssh服务端
+                    this.socket.emit('ssh-connect', {
+                        ...this.form,
+                        cols: 100,
+                        rows: 20,
+                    })
+
+                    // 只要有键入 就会触发该事件
+                    this.term.onData((data) => {
+                        this.socket.emit("ssh-data", data);
+                    });
+
+
+                    // socket.on()用于监听获取服务端（后端）发送过来的数据, 第一个参数为监听的标识
+                    this.socket.on("ssh-data", (data) => {
+                        this.term.write(data)
+                    });
+
+                    window.addEventListener(
+                        "resize",
+                        () => {
+                            this.socket.emit("resize", {
+                                cols: 100,
+                                rows: 20,
+                            });
+                        },
+                        false
+                    );
+                    this.socket.on("disconnect", (reason) => {
+                        //监听连接异常中断
+                        this.isConnect = true
+                    });
                 },
                 copyBt() {
                     navigator.clipboard.writeText('yum install -y wget && wget -O install.sh http://download.bt.cn/install/install_6.0.sh && sh install.sh 88bc7c62');

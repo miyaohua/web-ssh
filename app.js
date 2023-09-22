@@ -4,6 +4,7 @@ const http = require("http");
 const server = http.createServer(app.callback());
 const io = require("socket.io")(server, { cors: true });
 const { Client } = require("ssh2");
+const utf8 = require('utf8');
 
 // 用于存放每个ssh客户端id
 var connects = {};
@@ -15,13 +16,14 @@ const createSSh = (sshInfo, socket) => {
   }
 
   const conn = connects[socket.id];
-  // 可云(www.vpske.cn)
   conn
     .on("ready", () => {
       console.log(sshInfo.host + "已成功连接");
       socket.emit(
         "ssh-data",
-        "*** 欢迎使用webSSh " + sshInfo.host + "连接成功 ***\r\n"
+        "*** 欢迎使用可云(www.vpske.cn) webSSh IP: " +
+          sshInfo.host +
+          " 连接成功 ***\r\n"
       );
       // 连接成功
       // ssh设置cols和rows处理界面输入字符过长显示问题
@@ -41,10 +43,10 @@ const createSSh = (sshInfo, socket) => {
 
           stream
             .on("data", function (d) {
-              socket.emit("ssh-data", d.toString("binary"));
+              socket.emit("ssh-data", utf8.decode(d.toString("binary")));
             })
             .on("close", function () {
-              ssh.end();
+              conn.end();
             });
 
           // 监听窗口事件

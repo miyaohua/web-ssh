@@ -6,42 +6,75 @@ const io = require("socket.io")(server, { cors: true });
 const { Client } = require("ssh2");
 
 // 用于存放每个ssh客户端id
-let connects = {};
+var connects = {};
+// 创建ssh连接
+const createSSh = (sshInfo, socket) => {
+  // 如果客户端没有连接 则创建
+  if (!connects[socket.id]) {
+    connects[socket.id] = new Client();
+  }
 
-io.on("connection", (socket) => {
-  console.log("client connected");
-  socket.on("ssh-connect", (sshInfo) => {
-    // 如果客户端没有连接 则创建
-    if (!connects[socket.id]) {
-      connects[socket.id] = new Client();
-    }
-    const conn = connects[socket.id];
+  const conn = connects[socket.id];
+  // 可云(www.vpske.cn)
+  conn
+    .on("ready", () => {
+      console.log(sshInfo.host + "已成功连接");
+      socket.emit(
+        "ssh-data",
+        "*** 欢迎使用webSSh " + sshInfo.host + "连接成功 ***\r\n"
+      );
+      // 连接成功
+      // ssh设置cols和rows处理界面输入字符过长显示问题
+      conn.shell(
+        { cols: sshInfo.cols, rows: sshInfo.rows },
+        function (err, stream) {
+          if (err) {
+            return socket.emit(
+              "ssh-data",
+              "\r\n*** SSH SHELL ERROR: " + err.message + " ***\r\n"
+            );
+          }
 
-    conn.on("error", (err) => {
-      console.error("连接失败:", err.message);
-      socket.emit("ssh-error", err.message);
-    });
-
-    conn
-      .on("ready", () => {
-        conn.shell((err, stream) => {
-          if (err) throw err;
-          stream.on("data", (data) => {
-            socket.emit("ssh-data", data.toString("utf-8"));
+          socket.on("ssh-data", function (data) {
+            stream.write(data);
           });
 
-          socket.on("ssh-command", () => {
-            stream.write("\n");
+          stream
+            .on("data", function (d) {
+              socket.emit("ssh-data", d.toString("binary"));
+            })
+            .on("close", function () {
+              ssh.end();
+            });
+
+          // 监听窗口事件
+          socket.on("resize", function socketOnResize(data) {
+            stream.setWindow(data.rows, data.cols);
           });
-        });
-      })
-      .connect({ ...sshInfo });
+        }
+      );
+    })
+    .on("close", () => {
+      socket.emit("ssh-data", "\r\n*** SSH CONNECTION CLOSED ***\r\n");
+    })
+    .on("error", (err) => {
+      socket.emit(
+        "ssh-data",
+        "\r\n*** SSH CONNECTION ERROR: " + err.message + " ***\r\n"
+      );
+    })
+    .connect({ ...sshInfo });
+};
+
+io.on("connection", function (socket) {
+  socket.on("ssh-connect", function (sshInfo) {
+    console.log("有用户连接websocket");
+    // 新建一个ssh连接
+    createSSh(sshInfo, socket);
   });
 
-  // 监听客户端断开连接事件
-  socket.on("disconnect", () => {
-    delete connects[socket.id];
-    console.log("用户已断开连接");
+  socket.on("disconnect", function () {
+    console.log("有用户断开连接websocket");
   });
 });
 

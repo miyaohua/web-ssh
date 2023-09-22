@@ -7,6 +7,7 @@
     <title>web-SSh</title>
     <link rel="stylesheet" href="./elementPlus/element.css">
     <link rel="stylesheet" href="./xterm/xterm.css" />
+    <link rel="stylesheet" href="./css/index.css">
     <script src="./vue/vue.js"></script>
     <script src="./elementPlus/element.js"></script>
     <script src="./socket/socket.io.js"></script>
@@ -15,8 +16,8 @@
 
 <body>
     <div id="app">
-        <div v-if="isConnect">
-            <el-form :model="form" label-width="120px" :rules="rules" ref="formRef">
+        <div class="login-wrap" v-if="isConnect">
+            <el-form :model="form" label-width="80px" :rules="rules" ref="formRef">
                 <el-form-item label="HOST" prop="host">
                     <el-input v-model="form.host" placeholder="请输入IP" />
                 </el-form-item>
@@ -34,8 +35,14 @@
                 </el-form-item>
             </el-form>
         </div>
-        <div v-else="isConnect">
+        <div class="func-wrap" v-else="isConnect">
+            <!-- ssh操作 -->
             <div id="terminal"></div>
+            <!-- 操作栏 -->
+            <div class="func-panel">
+                <el-button @click="copyBt" type="primary">一键复制宝塔安装命令</el-button>
+                <el-button type="primary">待开发...</el-button>
+            </div>
         </div>
     </div>
 
@@ -61,10 +68,10 @@
                         ],
                     },
                     form: {
-                        host: '',
+                        host: '211.101.235.182',
                         port: '22',
-                        username: '',
-                        password: ''
+                        username: 'root',
+                        password: '109aZqKjxRcyDCA'
                     }
                 };
             },
@@ -97,51 +104,40 @@
                         this.$nextTick(() => {
                             this.term.open(document.getElementById('terminal'));
                             console.log('初始化终端成功')
-                            this.term.reset();
-                            this.runFakeTerminal()
+                            this.term.focus();
                         })
                         // 通过服务器信息连接socket 后端连接ssh服务端
-                        this.socket.emit('ssh-connect', { ...this.form })
-
-                        // 监听ssh返回的错误信息
-                        this.socket.on('ssh-error', (data) => {
-                            // this.term.options.disableStdin = true;
-                            this.term.write(data)
+                        this.socket.emit('ssh-connect', {
+                            ...this.form,
+                            cols: 100,
+                            rows: 20,
                         })
 
-                        // 监听ssh返回的信息
-                        this.socket.on('ssh-data', (data) => {
+                        // 只要有键入 就会触发该事件
+                        this.term.onData((data) => {
+                            this.socket.emit("ssh-data", data);
+                        });
+
+
+                        // socket.on()用于监听获取服务端（后端）发送过来的数据, 第一个参数为监听的标识
+                        this.socket.on("ssh-data", (data) => {
                             this.term.write(data)
-                        })
+                        });
+
+                        window.addEventListener(
+                            "resize",
+                            () => {
+                                this.socket.emit("resize", {
+                                    cols: 100,
+                                    rows: 20,
+                                });
+                            },
+                            false
+                        );
                     })
                 },
-                runFakeTerminal() {
-                    if (this.term._initialized) {
-                        return;
-                    }
-                    this.term._initialized = true;
-
-                    this.term.writeln('welcome kevps(www.vpske.cn) xterm!');
-
-                    this.term.onKey(e => {
-                        const printable = !e.domEvent.altKey && !e.domEvent.altGraphKey && !e.domEvent.ctrlKey && !e.domEvent.metaKey;
-                        // enter key
-                        if (e.domEvent.keyCode === 13) {
-                            // 发送消息
-                        } else if (e.domEvent.keyCode === 8) { // BackSpace key
-                            if (this.term._core.buffer.x > 2) {
-                                this.term.write('\b \b');
-                            }
-                        } else if (printable) {
-                            this.term.write(e.key);
-                        }
-                    });
-                    this.term.onData((data) => {
-                        console.log(JSON.stringify(data))
-                    })
-                },
-                prompt() {
-                    this.socket.emit('ssh-command')
+                copyBt() {
+                    navigator.clipboard.writeText('yum install -y wget && wget -O install.sh http://download.bt.cn/install/install_6.0.sh && sh install.sh 88bc7c62');
                 }
             },
         };

@@ -1,0 +1,40 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+#app {
+  width: 100vw;
+  height: 100vh;
+  background-color: #eee;
+}
+
+.login-wrap {
+  width: 430px;
+  height: 430px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 2%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.func-wrap {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: space-between;
+  padding: 50px;
+  box-sizing: border-box;
+}
+
+#terminal {
+  width: 70%;
+}
+
+.func-panel {
+  width: 28%;
+}

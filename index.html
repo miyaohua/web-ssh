@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>web-SSh</title>
+    <link rel="stylesheet" href="./elementPlus/element.css">
+    <link rel="stylesheet" href="./xterm/xterm.css" />
+    <script src="./vue/vue.js"></script>
+    <script src="./elementPlus/element.js"></script>
+    <script src="./socket/socket.io.js"></script>
+    <script src="./xterm/xterm.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div v-if="isConnect">
+            <el-form :model="form" label-width="120px" :rules="rules" ref="formRef">
+                <el-form-item label="HOST" prop="host">
+                    <el-input v-model="form.host" placeholder="请输入IP" />
+                </el-form-item>
+                <el-form-item label="port" prop="port">
+                    <el-input v-model="form.port" placeholder="请输入端口" />
+                </el-form-item>
+                <el-form-item label="username" prop="username">
+                    <el-input v-model="form.username" placeholder="请输入用户名" />
+                </el-form-item>
+                <el-form-item label="password" prop="password">
+                    <el-input type="password" v-model="form.password" show-password placeholder="请输入密码" />
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="primary" @click="onConnect">connect</el-button>
+                </el-form-item>
+            </el-form>
+        </div>
+        <div v-else="isConnect">
+            <div id="terminal"></div>
+        </div>
+    </div>
+
+    <script>
+        const App = {
+            data() {
+                return {
+                    term: {}, // term实例
+                    socket: {}, // websocket实例
+                    isConnect: true,
+                    rules: {
+                        host: [
+                            { required: true, message: '请输入IP', trigger: 'blur' },
+                        ],
+                        port: [
+                            { required: true, message: '请输入端口', trigger: 'blur' },
+                        ],
+                        username: [
+                            { required: true, message: '请输入用户名', trigger: 'blur' },
+                        ],
+                        password: [
+                            { required: true, message: '请输入密码', trigger: 'blur' },
+                        ],
+                    },
+                    form: {
+                        host: '',
+                        port: '22',
+                        username: '',
+                        password: ''
+                    }
+                };
+            },
+            methods: {
+                onConnect() {
+                    console.log('提交')
+                    this.$refs.formRef.validate(valid => {
+                        if (!valid) return
+                        // 连接socket
+                        this.ws();
+                    })
+                },
+                ws() {
+                    this.socket = io.connect("http://localhost:3000");
+                    this.socket.on('connect', () => {
+                        console.log('连接websocket成功')
+                        this.isConnect = false;
+                        console.log('开始初始化终端界面')
+                        this.term = new Terminal({
+                            cursorStyle: 'underline', //光标样式
+                            cursorBlink: true, // 光标闪烁
+                            convertEol: true, //启用时，光标将设置为下一行的开头
+                            disableStdin: false, //是否应禁用输入。
+                            theme: {
+                                foreground: 'white', //字体
+                                background: '#060101', //背景色
+                                cursor: 'help',//设置光标
+                            }
+                        });
+                        this.$nextTick(() => {
+                            this.term.open(document.getElementById('terminal'));
+                            console.log('初始化终端成功')
+                            this.term.reset();
+                            this.runFakeTerminal()
+                        })
+                        // 通过服务器信息连接socket 后端连接ssh服务端
+                        this.socket.emit('ssh-connect', { ...this.form })
+
+                        // 监听ssh返回的错误信息
+                        this.socket.on('ssh-error', (data) => {
+                            // this.term.options.disableStdin = true;
+                            this.term.write(data)
+                        })
+
+                        // 监听ssh返回的信息
+                        this.socket.on('ssh-data', (data) => {
+                            this.term.write(data)
+                        })
+                    })
+                },
+                runFakeTerminal() {
+                    if (this.term._initialized) {
+                        return;
+                    }
+                    this.term._initialized = true;
+
+                    this.term.writeln('welcome kevps(www.vpske.cn) xterm!');
+
+                    this.term.onKey(e => {
+                        const printable = !e.domEvent.altKey && !e.domEvent.altGraphKey && !e.domEvent.ctrlKey && !e.domEvent.metaKey;
+                        // enter key
+                        if (e.domEvent.keyCode === 13) {
+                            // 发送消息
+                        } else if (e.domEvent.keyCode === 8) { // BackSpace key
+                            if (this.term._core.buffer.x > 2) {
+                                this.term.write('\b \b');
+                            }
+                        } else if (printable) {
+                            this.term.write(e.key);
+                        }
+                    });
+                    this.term.onData((data) => {
+                        console.log(JSON.stringify(data))
+                    })
+                },
+                prompt() {
+                    this.socket.emit('ssh-command')
+                }
+            },
+        };
+        const app = Vue.createApp(App);
+        app.use(ElementPlus);
+        app.mount("#app");
+    </script>
+</body>
+
+</html>
